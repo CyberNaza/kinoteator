@@ -132,5 +132,10 @@ AUTH_USER_MODEL = 'register_sms.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+
     )
 }
+DEFAULT_PARSER_CLASSES = [
+    "rest_framework.parsers.JSONParser",
+]

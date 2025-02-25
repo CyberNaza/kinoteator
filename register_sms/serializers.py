@@ -1,52 +1,51 @@
-from rest_framework import serializers
-from .models import User
 from random import randint
-from .models import Movie, Actor, Comment
-
-
 from rest_framework import serializers
-from django.core.validators import RegexValidator
-from .models import User
-import random
 
-class SendCodeSerializer(serializers.Serializer):
-    phone_regex = RegexValidator(regex=r'^\+?1?\d{9,14}$', message="Invalid phone number format.")
-    phone = serializers.CharField(validators=[phone_regex], max_length=17)
+from .models import *
 
-    def validate_phone(self, value):
-        """Check if the phone number exists and generate a verification code."""
-        user, created = User.objects.get_or_create(phone=value, defaults={'is_active': False})
-        verification_code = random.randint(100000, 999999)  
-        user.verification_code = verification_code
-        user.is_active = False
-        user.save()
+class PhoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('phone',)
 
-        
-        print(f"Verification Code: {verification_code}") 
+class RegisterSerializer(serializers.ModelSerializer):
+    confirm_password = serializers.CharField(required=True)
 
-        return value
-
-class VerifyCodeSerializer(serializers.Serializer):
-    phone = serializers.CharField(max_length=17)
-    code = serializers.IntegerField()
-
+    class Meta:
+        model = User
+        fields = ("id", "is_user", "is_admin", "phone", "password", "confirm_password")
     def validate(self, data):
-        """Check if the code matches the stored code."""
-        phone = data.get("phone")
-        code = data.get("code")
+        password = data.get("password")
+        confirm_password = data.get("confirm_password")
 
-        try:
-            user = User.objects.get(phone=phone)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({"phone": "Phone number not found."})
+        if password != confirm_password:
+            raise serializers.ValidationError("Passwords must match")
 
-        if str(user.verification_code) != str(code):
-            raise serializers.ValidationError({"code": "Invalid verification code."})
-
-        user.is_active = True
-        user.verification_code = None 
-        user.save()
         return data
+
+    def create(self, validated_data):
+        """Create a new user"""
+        password = validated_data.pop("confirm_password")
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.is_active = True
+        user.save()
+        return user
+
+class VerifyOTPSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=15)
+    verification_code = serializers.CharField(max_length=4)
+
+class LoginSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("phone","password")
+
+
+
+
+
+
     
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -60,8 +59,9 @@ class ActorSerializer(serializers.ModelSerializer):
         model = Actor
         fields = '__all__'
 
-
 class CommentSerializer(serializers.ModelSerializer):
+    user_id = serializers.ReadOnlyField(source='user.id') 
+
     class Meta:
         model = Comment
-        fields = '__all__'
+        fields = ['id', 'text', 'movie_id', 'user_id', 'create_date']
